@@ -14,10 +14,46 @@ import Layout from '../../components/Layout.astro'
       document.querySelector<HTMLInputElement>('#canvas-wrapper')
     if (!canvasWrapper) return
 
-    const sketch = (p: P5) => {
+    function drawTree(p: P5, x: number, y: number) {
+      const radius = 20
+      const controlOffset = radius / 5
+      const points = 20
+      const angleBetween = p.TWO_PI / points
+
+      p.beginShape()
+      for (let i = 0; i < points; i++) {
+        const angle = i * angleBetween
+        const nextAngle = (i + 1) * angleBetween
+
+        const currentX = x + p.cos(angle) * radius
+        const currentY = y + p.sin(angle) * radius
+
+        const nextX = x + p.cos(nextAngle) * radius
+        const nextY = y + p.sin(nextAngle) * radius
+
+        const controlX =
+          x + p.cos(angle + angleBetween / 2) * (radius + controlOffset)
+        const controlY =
+          y + p.sin(angle + angleBetween / 2) * (radius + controlOffset)
+
+        if (i === 0) {
+          p.vertex(currentX, currentY)
+        }
+
+        // @ts-ignore
+        p.quadraticVertex(controlX, controlY, nextX, nextY)
+      }
+      p.endShape(p.CLOSE)
+    }
+
+    function sketch(p: P5) {
       p.setup = () => {
         p.createCanvas(200, 200)
-        p.background(255, 100, 150)
+        p.background(255)
+
+        p.strokeWeight(2)
+        p.stroke(50, 155, 150)
+        drawTree(p, 100, 100)
       }
     }
 

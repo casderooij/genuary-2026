@@ -10,7 +10,7 @@
   },
   "dependencies": {
     "astro": "^5.16.6",
-    "p5": "^2.1.2"
+    "p5": "^1.11.10"
   },
   "devDependencies": {
     "@types/p5": "^1.7.7",
