@@ -14,27 +14,36 @@ import Layout from '../../components/Layout.astro'
       document.querySelector<HTMLInputElement>('#canvas-wrapper')
     if (!canvasWrapper) return
 
-    function drawTree(p: P5, x: number, y: number) {
-      const radius = 20
-      const controlOffset = radius / 5
+    function drawTree(
+      p: P5,
+      x: number,
+      y: number,
+      radius: number,
+      angleOffset: number,
+    ) {
+      const controlOffset = radius / 6
       const points = 20
       const angleBetween = p.TWO_PI / points
+
+      p.push()
+      p.translate(x, y)
+      p.rotate(angleOffset)
 
       p.beginShape()
       for (let i = 0; i < points; i++) {
         const angle = i * angleBetween
         const nextAngle = (i + 1) * angleBetween
 
-        const currentX = x + p.cos(angle) * radius
-        const currentY = y + p.sin(angle) * radius
+        const currentX = p.cos(angle) * (radius * 1.5)
+        const currentY = p.sin(angle) * radius
 
-        const nextX = x + p.cos(nextAngle) * radius
-        const nextY = y + p.sin(nextAngle) * radius
+        const nextX = p.cos(nextAngle) * (radius * 1.5)
+        const nextY = p.sin(nextAngle) * radius
 
         const controlX =
-          x + p.cos(angle + angleBetween / 2) * (radius + controlOffset)
+          p.cos(angle + angleBetween / 2) * (radius * 1.5 + controlOffset)
         const controlY =
-          y + p.sin(angle + angleBetween / 2) * (radius + controlOffset)
+          p.sin(angle + angleBetween / 2) * (radius + controlOffset)
 
         if (i === 0) {
           p.vertex(currentX, currentY)
@@ -44,19 +53,102 @@ import Layout from '../../components/Layout.astro'
         p.quadraticVertex(controlX, controlY, nextX, nextY)
       }
       p.endShape(p.CLOSE)
+      p.pop()
     }
 
-    function sketch(p: P5) {
-      p.setup = () => {
-        p.createCanvas(200, 200)
-        p.background(255)
+    type Point = { x: number; y: number; r: number }
 
+    let allPoints: Point[][] = []
+    let currentPoints: Point[] = []
+
+    function sketch(p: P5) {
+      let debug = false
+
+      const debugButton = p.createButton('debug')
+      debugButton.mouseClicked(() => (debug = !debug))
+
+      p.setup = () => {
+        p.createCanvas(500, 500)
+      }
+
+      p.draw = () => {
+        p.background(0)
+
+        p.stroke(0)
         p.strokeWeight(2)
-        p.stroke(50, 155, 150)
-        drawTree(p, 100, 100)
+        p.fill(20, 199, 100)
+        allPoints.forEach((points) => {
+          for (let i = 0; i < points.length; i++) {
+            const { x, y, r } = points[i]
+            let angleOffset = 0
+
+            if (i > 0) {
+              // Calculate angle using the previous point
+              const prevPoint = points[i - 1]
+              angleOffset = p.atan2(y - prevPoint.y, x - prevPoint.x)
+            } else if (points.length > 1) {
+              // If it's the first point and there's a next point, use it for direction
+              const nextPoint = points[i + 1]
+              angleOffset = p.atan2(nextPoint.y - y, nextPoint.x - x)
+            }
+
+            drawTree(p, x, y, r, angleOffset)
+          }
+        })
+
+        if (debug) {
+          p.noFill()
+          p.stroke(255)
+          p.strokeWeight(1)
+          allPoints.forEach((points) => {
+            p.beginShape()
+            points.forEach(({ x, y }) => {
+              p.vertex(x, y)
+            })
+            p.endShape()
+          })
+
+          p.rectMode(p.CENTER)
+          p.stroke(255)
+          p.strokeWeight(1)
+          p.fill(0)
+          allPoints.forEach((points) => {
+            points.forEach(({ x, y }) => {
+              p.rect(x, y, 5, 5)
+            })
+          })
+        }
+      }
+
+      p.mousePressed = () => {
+        currentPoints = []
+        allPoints.push(currentPoints)
+      }
+
+      p.mouseDragged = () => {
+        const lastPoint = currentPoints[currentPoints.length - 1]
+        const mousePoint = { x: p.mouseX, y: p.mouseY, r: p.random(10, 16) }
+
+        if (
+          !lastPoint ||
+          p.dist(lastPoint.x, lastPoint.y, mousePoint.x, mousePoint.y) >= 20
+        ) {
+          currentPoints.push(mousePoint)
+        }
       }
     }
 
     new P5(sketch, canvasWrapper)
   })
 </script>
+
+<style is:global>
+  #canvas-wrapper {
+    display: inline-block;
+    border: 1px solid black;
+  }
+
+  #canvas-wrapper > canvas {
+    display: block;
+  }
+</style>
