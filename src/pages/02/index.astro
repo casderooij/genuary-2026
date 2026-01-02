@@ -1,0 +1,119 @@
+---
+import Layout from '../../components/Layout.astro'
+---
+
+<Layout title="02-01-2026 - Twelve principles of animation">
+  <div id="canvas-wrapper"></div>
+</Layout>
+
+<script>
+  import P5 from 'p5'
+
+  document.addEventListener('DOMContentLoaded', () => {
+    const canvasWrapper =
+      document.querySelector<HTMLInputElement>('#canvas-wrapper')
+    if (!canvasWrapper) return
+
+    type Layer = { g: P5.Graphics; w: number; h: number; r: number }
+
+    function sketch(p: P5) {
+      let roughTexture: Promise<P5.Image>
+
+      // @ts-ignore
+      p.preload = () => {
+        roughTexture = p.loadImage('/rough-texture.jpg')
+      }
+
+      function createLayer(w: number, h: number, i: number): Layer {
+        const g = p.createGraphics(w, h)
+        const rotation = p.random(p.TWO_PI)
+
+        g.imageMode(p.CENTER)
+        g.rectMode(p.CENTER)
+        g.push()
+        g.rotate(rotation)
+        g.image(
+          roughTexture,
+          0,
+          0,
+          w * 2,
+          h * 2,
+          740 / 2,
+          493 / 2,
+          w * 2,
+          h * 2,
+          p.CONTAIN,
+        )
+        g.pop()
+        return { g, w, h, r: rotation }
+      }
+
+      function createGroup(): Layer[] {
+        const amountOfLayers = 30
+        const layers: Layer[] = []
+
+        for (let i = 0; i < amountOfLayers; i++) {
+          const w = p.random(40, 280)
+          const h = p.random(20, 250)
+          layers.push(createLayer(w, h, i))
+        }
+
+        return layers
+      }
+
+      function animateGroup(group: Layer[], t: number) {
+        const amountOfLayers = group.length
+        const radius = 220
+        const angleBetween = p.TWO_PI / amountOfLayers
+
+        for (let i = 0; i < amountOfLayers; i++) {
+          const x = p.cos(angleBetween * i + t + t) * radius
+          const y = p.sin((angleBetween / 2.2) * i + t) * radius
+          const { g, w, h, r } = group[i]
+
+          p.push()
+          p.translate(x, y)
+          p.rotate(r)
+          p.image(g, 0, 0, w / 2, h / 2)
+          p.pop()
+        }
+      }
+
+      let time = 0
+      let group: Layer[]
+
+      p.setup = () => {
+        p.createCanvas(600, 600)
+        p.imageMode(p.CENTER)
+
+        group = createGroup()
+      }
+
+      p.draw = () => {
+        time += 0.001
+        const n = p.noise(time)
+
+        p.background(0)
+
+        p.push()
+        p.translate(p.width / 2, p.height / 2)
+        // animateGroup(group, p.map(n, 0, 1, -10, 10))
+        animateGroup(group, time * 6)
+        p.pop()
+      }
+    }
+
+    new P5(sketch, canvasWrapper)
+  })
+</script>
+
+<style is:global>
+  #canvas-wrapper {
+    display: inline-block;
+    border: 1px solid black;
+  }
+
+  #canvas-wrapper > canvas {
+    display: block;
+  }
+</style>
