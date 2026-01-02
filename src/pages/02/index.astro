@@ -58,6 +58,21 @@ import Layout from '../../components/Layout.astro'
           layers.push(createLayer(w, h, i))
         }
 
+        const w = 200
+
+        const face = p.createGraphics(w, w)
+        face.fill(40, 40, 255)
+        face.noStroke()
+        face.ellipseMode(p.CENTER)
+        face.ellipse(w / 4, w / 4, 40)
+        face.ellipse(w - w / 4, w / 4, 40)
+        face.noFill()
+        face.stroke(40, 40, 255)
+        face.strokeWeight(24)
+        face.arc(w / 2, w / 2 - 10, w / 1.2, w / 1.2, 0.5, p.PI - 0.5)
+        face.filter(p.BLUR, 6)
+        layers.push({ g: face, w, h: w, r: 0 })
+
         return layers
       }
 
