@@ -1,0 +1,145 @@
+---
+import Layout from '../../components/Layout.astro'
+---
+
+<Layout title="04-01-2026 - Lowres">
+  <div id="canvas-wrapper"></div>
+</Layout>
+
+<script>
+  import P5 from 'p5'
+  import jsfeat from '../../js/jsfeat'
+
+  document.addEventListener('DOMContentLoaded', () => {
+    const canvasWrapper =
+      document.querySelector<HTMLInputElement>('#canvas-wrapper')
+    if (!canvasWrapper) return
+
+    function sketch(p: P5) {
+      let video: P5.MediaElement
+      let img_u8
+      let options
+      const blockSize = 10 // Size of the blocks for filling
+
+      p.setup = () => {
+        p.createCanvas(640, 480)
+        video = p.createCapture(p.VIDEO)
+        video.size(640, 480)
+        video.hide()
+
+        img_u8 = new jsfeat.matrix_t(640, 480, jsfeat.U8C1_t)
+
+        options = {
+          blur_radius: 4,
+          low_threshold: 20,
+          high_threshold: 50,
+        }
+
+        p.noStroke()
+      }
+
+      function findContours() {
+        const contours = []
+        const visited = new Array(640 * 480).fill(false)
+
+        function contour(x, y) {
+          const points = []
+          const stack = [[x, y]]
+          const directions = [
+            [1, 0],
+            [-1, 0],
+            [0, 1],
+            [0, -1],
+            [1, 1],
+            [-1, -1],
+            [1, -1],
+            [-1, 1],
+          ]
+
+          while (stack.length) {
+            const [cx, cy] = stack.pop()
+            const index = cx + cy * p.width
+
+            if (
+              cx >= 0 &&
+              cx < p.width &&
+              cy >= 0 &&
+              cy < p.height &&
+              !visited[index] &&
+              img_u8.data[index] > 0
+            ) {
+              visited[index] = true
+              points.push(p.createVector(cx, cy))
+
+              directions.forEach(([dx, dy]) => {
+                stack.push([cx + dx, cy + dy])
+              })
+            }
+          }
+          return points
+        }
+
+        for (let y = 0; y < p.height; y++) {
+          for (let x = 0; x < p.width; x++) {
+            const index = x + y * p.width
+            if (img_u8.data[index] > 0 && !visited[index]) {
+              const contourPoints = contour(x, y)
+              if (contourPoints.length > 4) {
+                contours.push(contourPoints)
+              }
+            }
+          }
+        }
+        return contours
+      }
+
+      p.draw = () => {
+        p.background(0)
+        video.loadPixels()
+
+        jsfeat.imgproc.grayscale(video.pixels, 640, 480, img_u8)
+        const r = options.blur_radius
+        const kernel_size = (r + 1) << 1
+        jsfeat.imgproc.gaussian_blur(img_u8, img_u8, kernel_size, 0)
+        jsfeat.imgproc.canny(
+          img_u8,
+          img_u8,
+          options.low_threshold,
+          options.high_threshold,
+        )
+
+        const contours = findContours()
+        video.updatePixels()
+
+        contours.forEach((vertices) => {
+          if (vertices.length > 0) {
+            const sample = vertices[0]
+            const pixelIndex = (sample.x + sample.y * p.width) * 4
+            const r = video.pixels[pixelIndex]
+            const g = video.pixels[pixelIndex + 1]
+            const b = video.pixels[pixelIndex + 2]
+
+            // Fill larger blocks around each contour point
+            vertices.forEach((v) => {
+              p.fill(r, g, b, 200)
+              p.rect(v.x, v.y, blockSize, blockSize)
+            })
+          }
+        })
+      }
+    }
+
+    new P5(sketch, canvasWrapper)
+  })
+</script>
+
+<style is:global>
+  #canvas-wrapper {
+    display: inline-block;
+    border: 1px solid black;
+  }
+
+  #canvas-wrapper > canvas {
+    display: block;
+  }
+</style>
