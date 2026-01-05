@@ -1,0 +1,320 @@
+---
+import Layout from '../../components/Layout.astro'
+---
+
+<Layout title={`05-01-2026 - Write "Genuary"`}>
+  <div id="canvas-wrapper"></div>
+</Layout>
+
+<script>
+  import P5 from 'p5'
+
+  document.addEventListener('DOMContentLoaded', () => {
+    const canvasWrapper = document.querySelector(
+      '#canvas-wrapper',
+    ) as HTMLElement
+    if (!canvasWrapper) return
+
+    function drawDashedArc(
+      p: P5,
+      x: number,
+      y: number,
+      w: number,
+      h: number,
+      start: number,
+      stop: number,
+      dashLength: number,
+      gapLength: number,
+    ) {
+      const dashAngle = dashLength / (w / 2)
+      const gapAngle = gapLength / (w / 2)
+      let currentAngle = start
+
+      while (currentAngle < stop) {
+        const nextAngle = p.min(currentAngle + dashAngle, stop)
+        p.arc(x, y, w, h, currentAngle, nextAngle)
+        currentAngle = nextAngle + gapAngle
+      }
+    }
+
+    function drawDashedLine(
+      p: P5,
+      x1: number,
+      y1: number,
+      x2: number,
+      y2: number,
+      dashLength: number,
+      gapLength: number,
+    ) {
+      const distance = p.dist(x1, y1, x2, y2)
+      const dashGapTotal = dashLength + gapLength
+      const dashX = ((x2 - x1) / distance) * dashLength
+      const dashY = ((y2 - y1) / distance) * dashLength
+      const gapX = ((x2 - x1) / distance) * gapLength
+      const gapY = ((y2 - y1) / distance) * gapLength
+
+      let currentX = x1
+      let currentY = y1
+      let drawnDistance = 0
+
+      while (drawnDistance < distance) {
+        let endX = currentX + dashX
+        let endY = currentY + dashY
+
+        if (drawnDistance + dashLength > distance) {
+          endX = x2
+          endY = y2
+        }
+
+        p.line(currentX, currentY, endX, endY)
+        currentX += dashX + gapX
+        currentY += dashY + gapY
+        drawnDistance += dashGapTotal
+      }
+    }
+
+    type Arc = {
+      type: 'arc'
+      color: P5.Color
+      x: number
+      y: number
+      w: number
+      h: number
+      start: number
+      stop: number
+      angle: number
+    }
+
+    type Line = {
+      type: 'line'
+      color: P5.Color
+      x1: number
+      y1: number
+      x2: number
+      y2: number
+    }
+
+    function sketch(p: P5) {
+      let objects: (Arc | Line)[] = []
+      let state: 'none' | 'pressed' | 'drawing' = 'none'
+      let object: 'arc' | 'line' = 'arc'
+      let startPosition: { x: number; y: number } | null = null
+      let endPosition: { x: number; y: number } | null = null
+
+      const DASH_LENGTH = 10
+      const GAP_LENGTH = 20
+
+      const COLORS = [
+        p.color('#F1C7A0'),
+        p.color('#F27B65'),
+        p.color('#DE422C'),
+      ]
+
+      p.setup = () => {
+        p.createCanvas(600, 600)
+      }
+
+      p.draw = () => {
+        p.background(0)
+
+        p.stroke(255)
+        p.noFill()
+
+        if (state === 'pressed') {
+          drawIndicator(p, startPosition)
+        }
+
+        if (state === 'drawing' && startPosition && endPosition) {
+          if (object === 'arc') {
+            drawArc(p, startPosition, endPosition)
+          }
+          if (object === 'line') {
+            drawLine(p, startPosition, endPosition)
+          }
+        }
+
+        p.strokeWeight(16)
+        objects.forEach((object) => {
+          // p.stroke(object.color)
+          if (object.type === 'arc') {
+            drawStoredArc(p, object)
+          } else if (object.type === 'line') {
+            drawStoredLine(p, object)
+          }
+        })
+      }
+
+      function drawIndicator(p: P5, position: { x: number; y: number } | null) {
+        if (position) {
+          p.strokeWeight(1)
+          p.ellipse(position.x, position.y, 10, 10)
+        }
+      }
+
+      function drawLine(
+        p: P5,
+        start: { x: number; y: number },
+        end: { x: number; y: number },
+      ) {
+        drawIndicator(p, startPosition)
+
+        p.strokeWeight(2)
+
+        drawDashedLine(
+          p,
+          start.x,
+          start.y,
+          end.x,
+          end.y,
+          DASH_LENGTH,
+          GAP_LENGTH,
+        )
+        // p.line(start.x, start.y, end.x, end.y)
+      }
+
+      function drawArc(
+        p: P5,
+        start: { x: number; y: number },
+        end: { x: number; y: number },
+      ) {
+        const { centerX, centerY, width, angle, startAngle, stopAngle } =
+          calculateArcParams(start, end)
+
+        drawIndicator(p, startPosition)
+
+        p.push()
+        p.translate(centerX, centerY)
+        p.rotate(angle)
+
+        p.strokeWeight(2)
+
+        // p.arc(0, 0, width, width, startAngle, stopAngle)
+        drawDashedArc(
+          p,
+          0,
+          0,
+          width,
+          width,
+          startAngle,
+          stopAngle,
+          DASH_LENGTH,
+          GAP_LENGTH,
+        )
+
+        p.pop()
+      }
+
+      function drawStoredArc(p: P5, arc: Arc) {
+        p.push()
+        p.translate(arc.x, arc.y)
+        p.rotate(arc.angle)
+        p.arc(0, 0, arc.w, arc.h, arc.start, arc.stop)
+        p.pop()
+      }
+
+      function drawStoredLine(p: P5, line: Line) {
+        p.line(line.x1, line.y1, line.x2, line.y2)
+      }
+
+      function calculateArcParams(
+        start: { x: number; y: number },
+        end: { x: number; y: number },
+      ) {
+        const startX = start.x
+        const startY = start.y
+        const endX = end.x
+        const endY = end.y
+        const centerX = (startX + endX) / 2
+        const centerY = (startY + endY) / 2
+        const width = p.dist(startX, startY, endX, endY)
+        const angle = p.atan2(endY - startY, endX - startX)
+
+        const startAngle = 0
+        const stopAngle = p.PI
+
+        return { centerX, centerY, width, angle, startAngle, stopAngle }
+      }
+
+      p.mousePressed = () => {
+        state = 'pressed'
+        startPosition = { x: p.mouseX, y: p.mouseY }
+      }
+
+      p.mouseDragged = () => {
+        state = 'drawing'
+        endPosition = { x: p.mouseX, y: p.mouseY }
+      }
+
+      p.mouseReleased = () => {
+        if (state === 'drawing' && startPosition && endPosition) {
+          const color = p.random(COLORS)
+          if (object === 'arc') {
+            const { centerX, centerY, width, angle, startAngle, stopAngle } =
+              calculateArcParams(startPosition, endPosition)
+
+            const arc: Arc = {
+              type: 'arc',
+              color,
+              x: centerX,
+              y: centerY,
+              w: width,
+              h: width,
+              start: startAngle,
+              stop: stopAngle,
+              angle,
+            }
+            objects = [...objects, arc]
+          }
+
+          if (object === 'line') {
+            const line: Line = {
+              type: 'line',
+              color,
+              x1: startPosition.x,
+              y1: startPosition.y,
+              x2: endPosition.x,
+              y2: endPosition.y,
+            }
+            objects = [...objects, line]
+          }
+          resetPositions()
+        }
+      }
+
+      p.keyPressed = () => {
+        // ESC
+        if (p.keyCode === 27) {
+          resetPositions()
+        }
+
+        // i
+        if (p.keyCode === 73) {
+          if (object === 'arc') {
+            object = 'line'
+          } else if (object === 'line') {
+            object = 'arc'
+          }
+        }
+      }
+
+      function resetPositions() {
+        startPosition = null
+        endPosition = null
+        state = 'none'
+      }
+    }
+
+    new P5(sketch, canvasWrapper)
+  })
+</script>
+
+<style is:global>
+  #canvas-wrapper {
+    display: inline-block;
+    border: 1px solid black;
+  }
+
+  #canvas-wrapper > canvas {
+    display: block;
+  }
+</style>
